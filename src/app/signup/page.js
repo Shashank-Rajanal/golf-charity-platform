@@ -11,6 +11,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -85,15 +86,33 @@ export default function SignupPage() {
 		  </div>
 
 		  <div style={styles.field}>
-			<label style={styles.label}>Password</label>
-			<input
-			  type="password"
-			  value={password}
-			  onChange={(e) => setPassword(e.target.value)}
-			  placeholder="min. 6 characters"
-			  style={styles.input}
-			/>
-		  </div>
+  			<label style={styles.label}>Password</label>
+			<div style={{ position: 'relative' }}>
+				<input
+				type={showPassword ? 'text' : 'password'}
+				value={password}
+				onChange={(e) => setPassword(e.target.value)}
+				placeholder="min. 6 characters"
+				style={{ ...styles.input, width: '100%', paddingRight: '40px' }}
+				/>
+				<button
+				onClick={() => setShowPassword(!showPassword)}
+				style={{
+					position: 'absolute',
+					right: '12px',
+					top: '50%',
+					transform: 'translateY(-50%)',
+					background: 'none',
+					border: 'none',
+					cursor: 'pointer',
+					fontSize: '16px',
+					color: '#9ca3af',
+				}}
+				>
+				{showPassword ? '🙈' : '👁️'}
+				</button>
+			</div>
+		</div>
 
 		  <button
 			onClick={handleSignup}

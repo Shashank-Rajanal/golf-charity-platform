@@ -36,6 +36,9 @@ export default function DashboardPage() {
       .single()
 
     setProfile(profile)
+ 		if (profile?.is_new_user) {
+      		await supabase.from('profiles').update({ is_new_user: false }).eq('id', user.id)
+    	}
     await getScores(user.id)
     setLoading(false)
   }
@@ -140,7 +143,7 @@ export default function DashboardPage() {
 			</div>
           <div>
             <h2 style={styles.welcomeTitle}>
-              Welcome back, {profile?.full_name?.split(' ')[0] || 'Golfer'} 👋
+              {profile?.is_new_user ? 'Welcome' : 'Welcome back'}, {profile?.full_name?.split(' ')[0] || 'Golfer'} 👋
             </h2>
             <p style={styles.welcomeSub}>Here's your golf summary</p>
           </div>
