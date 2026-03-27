@@ -15,76 +15,69 @@ export default function DashboardPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  useEffect(() => {
-    getUser()
-  }, [])
+  useEffect(() => { getUser() }, [])
 
   async function getUser() {
     const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      router.push('/login')
-      return
-    }
-
+    if (!user) { router.push('/login'); return }
     setUser(user)
 
-    const { data: profile } = await supabase
+    const { data: profileData } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single()
 
-    setProfile(profile)
- 		if (profile?.is_new_user) {
-      		await supabase.from('profiles').update({ is_new_user: false }).eq('id', user.id)
-    	}
+    setProfile(profileData)
+
+    // Fix welcome message
+    if (profileData?.is_new_user) {
+      await supabase.from('profiles')
+        .update({ is_new_user: false })
+        .eq('id', user.id)
+    }
+
+    // Redirect admin to admin panel
+    if (profileData?.is_admin === true) {
+      router.push('/admin')
+      return
+    }
+
     await getScores(user.id)
     setLoading(false)
   }
 
   async function getScores(userId) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('scores')
       .select('*')
       .eq('user_id', userId)
       .order('date', { ascending: false })
       .limit(5)
-
-    setScores(data || [])
+    if (!error) setScores(data || [])
   }
 
   async function addScore() {
     setScoreError('')
-
     if (!newScore || !newDate) {
       setScoreError('Please enter both score and date')
       return
     }
-
     const scoreNum = parseInt(newScore)
     if (scoreNum < 1 || scoreNum > 45) {
       setScoreError('Score must be between 1 and 45')
       return
     }
-
-    // If already 5 scores, delete the oldest one
     if (scores.length >= 5) {
       const oldest = scores[scores.length - 1]
       await supabase.from('scores').delete().eq('id', oldest.id)
     }
-
     const { error } = await supabase.from('scores').insert({
       user_id: user.id,
       score: scoreNum,
       date: newDate,
     })
-
-    if (error) {
-      setScoreError(error.message)
-      return
-    }
-
+    if (error) { setScoreError(error.message); return }
     setNewScore('')
     setNewDate('')
     await getScores(user.id)
@@ -126,27 +119,25 @@ export default function DashboardPage() {
       <main style={styles.main}>
         {/* Welcome */}
         <div style={styles.welcomeRow}>
-			{/* Quick Nav */}
-			<div style={styles.quickNav}>
-			<button onClick={() => router.push('/subscribe')} style={styles.quickNavBtn}>
-				💳 Subscription
-			</button>
-			<button onClick={() => router.push('/charities')} style={styles.quickNavBtn}>
-				❤️ Charities
-			</button>
-			<button onClick={() => router.push('/draws')} style={styles.quickNavBtn}>
-				🏆 Draws
-			</button>
-			<button onClick={() => router.push('/admin')} style={styles.quickNavBtn}>
-				⚙️ Admin Panel
-			</button>
-			</div>
           <div>
             <h2 style={styles.welcomeTitle}>
               {profile?.is_new_user ? 'Welcome' : 'Welcome back'}, {profile?.full_name?.split(' ')[0] || 'Golfer'} 👋
             </h2>
             <p style={styles.welcomeSub}>Here's your golf summary</p>
           </div>
+        </div>
+
+        {/* Quick Nav — NO admin button */}
+        <div style={styles.quickNav}>
+          <button onClick={() => router.push('/subscribe')} style={styles.quickNavBtn}>
+            💳 Subscription
+          </button>
+          <button onClick={() => router.push('/charities')} style={styles.quickNavBtn}>
+            ❤️ Charities
+          </button>
+          <button onClick={() => router.push('/draws')} style={styles.quickNavBtn}>
+            🏆 Draws
+          </button>
         </div>
 
         {/* Stats Row */}
@@ -175,11 +166,10 @@ export default function DashboardPage() {
         <div style={styles.section}>
           <h3 style={styles.sectionTitle}>My Scores</h3>
           <p style={styles.sectionSub}>
-            Enter your last 5 Stableford scores (1–45). 
+            Enter your last 5 Stableford scores (1–45).
             A new score automatically replaces the oldest.
           </p>
 
-          {/* Add Score Form */}
           <div style={styles.scoreForm}>
             <input
               type="number"
@@ -205,7 +195,6 @@ export default function DashboardPage() {
             <p style={styles.scoreError}>{scoreError}</p>
           )}
 
-          {/* Scores List */}
           {scores.length === 0 ? (
             <p style={styles.emptyText}>
               No scores yet. Add your first score above!
@@ -218,7 +207,7 @@ export default function DashboardPage() {
                     <span style={styles.scoreRank}>#{index + 1}</span>
                     <span style={styles.scoreNum}>{score.score} pts</span>
                     <span style={styles.scoreDate}>
-                      {new Date(score.date).toLocaleDateString('en-GB', {
+                      {new Date(score.date).toLocaleDateString('en-IN', {
                         day: 'numeric',
                         month: 'short',
                         year: 'numeric'
@@ -260,235 +249,41 @@ export default function DashboardPage() {
 }
 
 const styles = {
-  loadingContainer: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    color: '#6b7280',
-    fontSize: '14px',
-  },
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f9fafb',
-  },
-  nav: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '16px 40px',
-    backgroundColor: '#ffffff',
-    borderBottom: '1px solid #e5e7eb',
-  },
-  logo: {
-    fontSize: '20px',
-    fontWeight: '700',
-    color: '#16a34a',
-  },
-  navRight: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-  },
-  navName: {
-    fontSize: '14px',
-    color: '#374151',
-    fontWeight: '500',
-  },
-  logoutBtn: {
-    fontSize: '14px',
-    color: '#6b7280',
-    background: 'none',
-    border: '1px solid #e5e7eb',
-    padding: '6px 14px',
-    borderRadius: '6px',
-  },
-  main: {
-    maxWidth: '860px',
-    margin: '0 auto',
-    padding: '40px 24px',
-  },
-  welcomeRow: {
-    marginBottom: '32px',
-  },
-  welcomeTitle: {
-    fontSize: '24px',
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: '4px',
-  },
-  welcomeSub: {
-    fontSize: '14px',
-    color: '#6b7280',
-  },
-  statsRow: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '16px',
-    marginBottom: '40px',
-  },
-  statCard: {
-    backgroundColor: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '10px',
-    padding: '20px',
-  },
-  statLabel: {
-    fontSize: '12px',
-    color: '#6b7280',
-    marginBottom: '8px',
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-  },
-  statValue: {
-    fontSize: '18px',
-    fontWeight: '700',
-    color: '#111827',
-  },
-  section: {
-    backgroundColor: '#ffffff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '10px',
-    padding: '28px',
-    marginBottom: '24px',
-  },
-  sectionTitle: {
-    fontSize: '16px',
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: '4px',
-  },
-  sectionSub: {
-    fontSize: '13px',
-    color: '#6b7280',
-    marginBottom: '20px',
-  },
-  scoreForm: {
-    display: 'flex',
-    gap: '12px',
-    marginBottom: '16px',
-    flexWrap: 'wrap',
-  },
-  scoreInput: {
-    padding: '9px 14px',
-    border: '1px solid #e5e7eb',
-    borderRadius: '8px',
-    fontSize: '14px',
-    color: '#111827',
-    outline: 'none',
-    flex: '1',
-    minWidth: '140px',
-  },
-  addBtn: {
-    backgroundColor: '#16a34a',
-    color: '#ffffff',
-    padding: '9px 20px',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    border: 'none',
-  },
-  scoreError: {
-    color: '#dc2626',
-    fontSize: '13px',
-    marginBottom: '12px',
-  },
-  emptyText: {
-    color: '#9ca3af',
-    fontSize: '14px',
-    textAlign: 'center',
-    padding: '32px 0',
-  },
-  scoresList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-  },
-  scoreRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '14px 16px',
-    backgroundColor: '#f9fafb',
-    borderRadius: '8px',
-    border: '1px solid #e5e7eb',
-  },
-  scoreLeft: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-  },
-  scoreRank: {
-    fontSize: '12px',
-    color: '#9ca3af',
-    fontWeight: '500',
-    width: '24px',
-  },
-  scoreNum: {
-    fontSize: '16px',
-    fontWeight: '700',
-    color: '#16a34a',
-  },
-  scoreDate: {
-    fontSize: '13px',
-    color: '#6b7280',
-  },
-  deleteBtn: {
-    fontSize: '13px',
-    color: '#dc2626',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-  },
-  subscriptionBanner: {
-    backgroundColor: '#f0fdf4',
-    border: '1px solid #bbf7d0',
-    borderRadius: '10px',
-    padding: '24px 28px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: '16px',
-  },
-  bannerTitle: {
-    fontSize: '15px',
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: '4px',
-  },
-  bannerSub: {
-    fontSize: '13px',
-    color: '#6b7280',
-  },
-  subscribeBtn: {
-    backgroundColor: '#16a34a',
-    color: '#ffffff',
-    padding: '10px 20px',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    border: 'none',
-    cursor: 'pointer',
-  },
-
-	quickNav: {
-	display: 'flex',
-	gap: '12px',
-	marginBottom: '32px',
-	flexWrap: 'wrap',
-	},
-	quickNavBtn: {
-	padding: '9px 18px',
-	backgroundColor: '#ffffff',
-	border: '1px solid #e5e7eb',
-	borderRadius: '8px',
-	fontSize: '13px',
-	fontWeight: '500',
-	color: '#374151',
-	cursor: 'pointer',
-	},
+  loadingContainer: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  loadingText: { color: '#6b7280', fontSize: '14px' },
+  container: { minHeight: '100vh', backgroundColor: '#f9fafb' },
+  nav: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 40px', backgroundColor: '#ffffff', borderBottom: '1px solid #e5e7eb' },
+  logo: { fontSize: '20px', fontWeight: '700', color: '#16a34a' },
+  navRight: { display: 'flex', alignItems: 'center', gap: '16px' },
+  navName: { fontSize: '14px', color: '#374151', fontWeight: '500' },
+  logoutBtn: { fontSize: '14px', color: '#6b7280', background: 'none', border: '1px solid #e5e7eb', padding: '6px 14px', borderRadius: '6px', cursor: 'pointer' },
+  main: { maxWidth: '860px', margin: '0 auto', padding: '40px 24px' },
+  welcomeRow: { marginBottom: '24px' },
+  welcomeTitle: { fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '4px' },
+  welcomeSub: { fontSize: '14px', color: '#6b7280' },
+  quickNav: { display: 'flex', gap: '12px', marginBottom: '32px', flexWrap: 'wrap' },
+  quickNavBtn: { padding: '9px 18px', backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', fontWeight: '500', color: '#374151', cursor: 'pointer' },
+  statsRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '40px' },
+  statCard: { backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '20px' },
+  statLabel: { fontSize: '12px', color: '#6b7280', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' },
+  statValue: { fontSize: '18px', fontWeight: '700', color: '#111827' },
+  section: { backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '28px', marginBottom: '24px' },
+  sectionTitle: { fontSize: '16px', fontWeight: '600', color: '#111827', marginBottom: '4px' },
+  sectionSub: { fontSize: '13px', color: '#6b7280', marginBottom: '20px' },
+  scoreForm: { display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' },
+  scoreInput: { padding: '9px 14px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', color: '#111827', outline: 'none', flex: '1', minWidth: '140px' },
+  addBtn: { backgroundColor: '#16a34a', color: '#ffffff', padding: '9px 20px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', border: 'none', cursor: 'pointer' },
+  scoreError: { color: '#dc2626', fontSize: '13px', marginBottom: '12px' },
+  emptyText: { color: '#9ca3af', fontSize: '14px', textAlign: 'center', padding: '32px 0' },
+  scoresList: { display: 'flex', flexDirection: 'column', gap: '10px' },
+  scoreRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', backgroundColor: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' },
+  scoreLeft: { display: 'flex', alignItems: 'center', gap: '16px' },
+  scoreRank: { fontSize: '12px', color: '#9ca3af', fontWeight: '500', width: '24px' },
+  scoreNum: { fontSize: '16px', fontWeight: '700', color: '#16a34a' },
+  scoreDate: { fontSize: '13px', color: '#6b7280' },
+  deleteBtn: { fontSize: '13px', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' },
+  subscriptionBanner: { backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '24px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' },
+  bannerTitle: { fontSize: '15px', fontWeight: '600', color: '#111827', marginBottom: '4px' },
+  bannerSub: { fontSize: '13px', color: '#6b7280' },
+  subscribeBtn: { backgroundColor: '#16a34a', color: '#ffffff', padding: '10px 20px', borderRadius: '8px', fontSize: '14px', fontWeight: '600', border: 'none', cursor: 'pointer' },
 }

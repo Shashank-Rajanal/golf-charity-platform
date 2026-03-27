@@ -30,7 +30,6 @@ export default function SubscribePage() {
       return
     }
 
-    // Simulate payment processing
     await new Promise((resolve) => setTimeout(resolve, 1500))
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -40,19 +39,30 @@ export default function SubscribePage() {
       ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
 
-    await supabase.from('subscriptions').insert({
-      user_id: user.id,
-      plan: selectedPlan,
-      amount: plans[selectedPlan].price,
-      status: 'active',
-      end_date: endDate,
-    })
+    // Insert subscription record
+    const { error: subError } = await supabase
+      .from('subscriptions')
+      .insert({
+        user_id: user.id,
+        plan: selectedPlan,
+        amount: plans[selectedPlan].price,
+        status: 'active',
+        end_date: endDate,
+      })
 
-    await supabase.from('profiles').update({
-      subscription_status: 'active',
-      subscription_plan: selectedPlan,
-      subscription_end_date: endDate,
-    }).eq('id', user.id)
+    if (subError) { setError(subError.message); setLoading(false); return }
+
+    // Update profile subscription status
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({
+        subscription_status: 'active',
+        subscription_plan: selectedPlan,
+        subscription_end_date: endDate,
+      })
+      .eq('id', user.id)
+
+    if (profileError) { setError(profileError.message); setLoading(false); return }
 
     router.push('/dashboard')
   }
@@ -64,7 +74,6 @@ export default function SubscribePage() {
         <h2 style={styles.title}>Choose your plan</h2>
         <p style={styles.sub}>Cancel anytime. No hidden fees.</p>
 
-        {/* Plan Selector */}
         <div style={styles.plans}>
           {Object.entries(plans).map(([key, plan]) => (
             <div
@@ -74,9 +83,7 @@ export default function SubscribePage() {
             >
               <div style={styles.planTop}>
                 <span style={styles.planLabel}>{plan.label}</span>
-                {plan.saving && (
-                  <span style={styles.planBadge}>{plan.saving}</span>
-                )}
+                {plan.saving && <span style={styles.planBadge}>{plan.saving}</span>}
               </div>
               <p style={styles.planPrice}>₹{plan.price}</p>
               <p style={styles.planPeriod}>{plan.period}</p>
@@ -84,7 +91,6 @@ export default function SubscribePage() {
           ))}
         </div>
 
-        {/* Mock Payment Form */}
         <div style={styles.form}>
           <p style={styles.formTitle}>Payment details</p>
           <p style={styles.mockNote}>🔒 Demo mode — no real payment processed</p>
@@ -93,43 +99,20 @@ export default function SubscribePage() {
 
           <div style={styles.field}>
             <label style={styles.label}>Name on card</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="John Smith"
-              style={styles.input}
-            />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="John Smith" style={styles.input} />
           </div>
           <div style={styles.field}>
             <label style={styles.label}>Card number</label>
-            <input
-              value={cardNumber}
-              onChange={(e) => setCardNumber(e.target.value)}
-              placeholder="1234 5678 9012 3456"
-              maxLength={19}
-              style={styles.input}
-            />
+            <input value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="1234 5678 9012 3456" maxLength={19} style={styles.input} />
           </div>
           <div style={styles.row}>
             <div style={styles.field}>
               <label style={styles.label}>Expiry</label>
-              <input
-                value={expiry}
-                onChange={(e) => setExpiry(e.target.value)}
-                placeholder="MM/YY"
-                maxLength={5}
-                style={styles.input}
-              />
+              <input value={expiry} onChange={(e) => setExpiry(e.target.value)} placeholder="MM/YY" maxLength={5} style={styles.input} />
             </div>
             <div style={styles.field}>
               <label style={styles.label}>CVV</label>
-              <input
-                value={cvv}
-                onChange={(e) => setCvv(e.target.value)}
-                placeholder="123"
-                maxLength={3}
-                style={styles.input}
-              />
+              <input value={cvv} onChange={(e) => setCvv(e.target.value)} placeholder="123" maxLength={3} style={styles.input} />
             </div>
           </div>
 

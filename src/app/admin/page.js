@@ -19,19 +19,37 @@ export default function AdminPage() {
 
   useEffect(() => { loadAll() }, [])
 
-  async function loadAll() {
-    const [u, c, d, w] = await Promise.all([
-      supabase.from('profiles').select('*'),
-      supabase.from('charities').select('*'),
-      supabase.from('draws').select('*').order('created_at', { ascending: false }),
-      supabase.from('winners').select('*'),
-    ])
-    setUsers(u.data || [])
-    setCharities(c.data || [])
-    setDraws(d.data || [])
-    setWinners(w.data || [])
-    setLoading(false)
+async function loadAll() {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) { router.push('/login'); return }
+
+  const { data: profileCheck } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single()
+
+  if (!profileCheck?.is_admin) {
+    router.push('/dashboard')
+    return
   }
+
+  // Fetch all users via admin API route (bypasses RLS)
+  const usersRes = await fetch('/api/admin/users')
+  const usersData = await usersRes.json()
+
+  const [c, d, w] = await Promise.all([
+    supabase.from('charities').select('*'),
+    supabase.from('draws').select('*').order('created_at', { ascending: false }),
+    supabase.from('winners').select('*'),
+  ])
+
+  setUsers(usersData.users || [])
+  setCharities(c.data || [])
+  setDraws(d.data || [])
+  setWinners(w.data || [])
+  setLoading(false)
+}
 
   async function addCharity() {
     if (!newCharity.name || !newCharity.description) return
